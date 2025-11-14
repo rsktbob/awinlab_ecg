@@ -13,11 +13,10 @@ import numpy as np
 
 # Dataset
 class ECGDataset(Dataset):
-    def __init__(self, img_paths, img_size=224, labels=None):
+    def __init__(self, img_paths, labels=None):
         self.img_paths = img_paths
         self.labels = labels
         self.transform = T.Compose([
-            T.Resize((img_size, img_size)),
             T.ToTensor(),
             T.Normalize(mean=[0.5], std=[0.5])
         ])
@@ -39,6 +38,25 @@ def parse_scp_codes_with_probs(s):
     except:
         return {'NORM': 100.0}
 
+def predict_accuracy(label_positions, predicted_probs, true_labels):
+    threshold = 0.5
+    correct_count = 0
+    
+    for label in true_labels:
+        pos = label_positions[label]
+        predicted_value = predicted_probs[pos]
+        true_value = true_labels[label]
+        
+        predicted_class = 1 if predicted_value > threshold else 0
+        true_class = 1 if true_value > threshold / 100 else 0
+        
+        if predicted_class == true_class:
+            correct_count += 1
+    
+    return correct_count
+
+
+
 if __name__ == "__main__":
     # 標籤與機率向量
     df = pd.read_csv('ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/ptbxl_database.csv')
@@ -48,6 +66,7 @@ if __name__ == "__main__":
         [d.get(name, 0)/100.0 for name in all_names] for d in all_dicts
     ], dtype=np.float32)
     print(all_names)
+    all_name_pos = {name : i for i, name in enumerate(all_names)}
 
     # 資料分割
     img_dir = Path("vit_ecg_images")
@@ -56,8 +75,8 @@ if __name__ == "__main__":
         img_paths, labels_prob, test_size=0.1, random_state=42
     )
 
-    train_dataset = ECGDataset(train_paths, img_size=224, labels=train_labels)
-    test_dataset = ECGDataset(test_paths, img_size=224, labels=test_labels)
+    train_dataset = ECGDataset(train_paths, labels=train_labels)
+    test_dataset = ECGDataset(test_paths, labels=test_labels)
 
     # DataLoader
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=0, pin_memory=True)
@@ -70,6 +89,7 @@ if __name__ == "__main__":
     num_features = model.num_features
     model.head = nn.Linear(num_features, num_classes)
     model.to(device)
+    
 
     # 損失與優化
     criterion = nn.BCEWithLogitsLoss()
@@ -102,9 +122,10 @@ if __name__ == "__main__":
             outputs = model(imgs)
             loss = criterion(outputs, labels)
             test_loss += loss.item() * imgs.size(0)
-            preds = torch.sigmoid(outputs) > 0.5
-            all_preds.append(preds.cpu().numpy())
-            all_labels_list.append(labels.cpu().numpy())
+            binary_preds = torch.sigmoid(outputs) > 0.5
+            binary_labels = labels > 0.5
+            all_preds.append(binary_preds.cpu().numpy())
+            all_labels_list.append(binary_labels.cpu().numpy())
 
     test_loss /= len(test_dataset)
     all_preds = np.vstack(all_preds)
@@ -124,5 +145,5 @@ if __name__ == "__main__":
         'test_loss': test_loss,
         'test_accuracy': accuracy,
         'label_names': all_names,
-    }, save_dir / 'ecg_vit_model_v2.pth')
+    }, save_dir / 'ecg_vit_model_v3.pth')
     print(f"Model saved at {save_dir / 'ecg_vit_model_v2.pth'}")

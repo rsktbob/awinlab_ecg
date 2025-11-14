@@ -4,4 +4,6 @@ pillow
 numpy
 timm
 matplotlib
+scipy
 wfdb
+neurokit2
