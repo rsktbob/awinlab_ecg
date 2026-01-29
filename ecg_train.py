@@ -89,7 +89,7 @@ if __name__ == "__main__":
     # 模型
     num_classes = len(all_names)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = timm.create_model('vit_small_patch16_dinov3_qkvb.lvd1689m', pretrained=True, num_classes=0)
+    model = timm.create_model('vit_small_patch16_dinov3.lvd1689m', pretrained=True, num_classes=0)
     num_features = model.num_features
     model.head = nn.Linear(num_features, num_classes)
     model.to(device)

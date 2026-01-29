@@ -28,7 +28,6 @@ import wfdb
 import neurokit2 as nk
 import pywt
 
-
 # ===================== 工具函數 =====================
 
 def align_image_to_16(img):
@@ -257,6 +256,6 @@ if __name__ == "__main__":
                     tasks.append((patient_dir, filename))
 
     with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(ecg_process_record, task, mode, use_cwt=False) for task in tasks]
+        futures = [executor.submit(ecg_process_record, task, mode, use_cwt=True) for task in tasks]
         for future in as_completed(futures):
             print(future.result())

@@ -34,12 +34,12 @@ def predict_ecg(img_path, model, label_names, device, threshold=0.5):
 
 # --- 載入模型 ---
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-checkpoint = torch.load("ecg_models/vit_small_dinov3_50.pth", map_location=device, weights_only=False)
+checkpoint = torch.load("ecg_models/vit_small_plus_dinov3_30.pth", map_location=device, weights_only=False)
 
 label_names = checkpoint['label_names']
 num_classes = len(label_names)
 
-model = timm.create_model('vit_small_patch16_dinov3.lvd1689m', pretrained=True, num_classes=0)
+model = timm.create_model('vit_small_plus_patch16_dinov3.lvd1689m', pretrained=True, num_classes=0)
 num_features = model.num_features
 model.head = nn.Linear(num_features, num_classes)
 model.load_state_dict(checkpoint['model_state_dict'])
@@ -108,6 +108,12 @@ auroc_macro = roc_auc_score(
     all_probs[:, valid_labels], 
     average='macro'
 )
+
+# 單筆預測
+img_path = "vit_ecg_images/00001_lr/00001_lr_12lead_vit_cwt.png"
+pred_labels, pred_probs = predict_ecg(img_path, model, label_names, device)
+print(f"Predicted Labels: {pred_labels}")
+print(f"Predicted Probabilities: {pred_probs}")
 
 # 輸出結果
 print(f"Accuracy: {accuracy:.4f}")
