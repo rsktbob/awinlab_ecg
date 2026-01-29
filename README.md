@@ -20,7 +20,7 @@
 ├── requirements.txt        # Python 相依套件列表
 ├── ecg_models/             # 儲存訓練好的模型目錄(此部分容量超過github上限，另放在https://drive.google.com/drive/folders/1tM3R6hCHCNamfD-4ZcnQmtnL1Aq2bfz2?usp=drive_link)
 ├── vit_ecg_images/         # 儲存生成影像的目錄 (此部分超出github上限，可使用ecg_image_generator.py來產生)
-└── ptb-xl-.../             # (外部) PTB-XL 資料集目錄
+└── ptb-xl-.../             # (外部) PTB-XL 資料集目錄 (此部分超出github上限，可到https://physionet.org/content/ptb-xl/1.0.3/下載)
 ```
 
 ## 🛠️ 安裝說明
@@ -33,13 +33,11 @@
     pip install -r requirements.txt
     ```
 
-    *注意：您還需要安裝與您的系統 (CPU 或 CUDA) 相容的 **PyTorch** 和 **torchvision**。請至 [pytorch.org](https://pytorch.org/get-started/locally/) 查詢適合您環境的安裝指令。*
-
 ## 📊 資料準備
 
 本專案使用 **PTB-XL** 資料集。
 
-1.  **下載資料集**：確保 PTB-XL 資料集位於專案根目錄下 (例如：`ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/`)。
+1.  **下載資料集**：確保 PTB-XL 資料集位於專案根目錄下 `ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/`。(可到https://physionet.org/content/ptb-xl/1.0.3進行下載)
 2.  **生成影像**：
     執行生成腳本將 ECG 訊號轉換為 CWT 影像。此過程使用多行程 (multiprocessing) 加速轉換。
 
@@ -72,13 +70,3 @@ python ecg_eval.py
 - 載入訓練好的模型。
 - 計算 **Accuracy (準確率)**、**F1-Score** 和 **AUROC**。
 - 對範例影像進行預測並輸出結果。
-
-## ⚙️ 參數設定
-
-- **影像生成**：您可以在 `ecg_image_generator.py` 中調整小波類型 (wavelet types) 或尺度 (scales)。
-- **訓練超參數**：Batch size (批次大小)、Learning rate (學習率) 和 Epochs (訓練輪數) 可在 `ecg_train.py` 中修改。
-- **模型架構**：可在訓練腳本中的 `timm.create_model` 呼叫處更換不同的 ViT 骨幹網路 (backbone)。
-
-## 📝 授權
-
-[MIT](https://choosealicense.com/licenses/mit/)
