@@ -5,6 +5,7 @@ from PIL import Image
 import torchvision.transforms as T
 import torchvision.models as models
 import pandas as pd
+from sklearn.metrics import accuracy_score
 import timm
 from pathlib import Path
 import ast
@@ -23,7 +24,7 @@ class ECGDataset(Dataset):
     def __len__(self): 
         return len(self.img_paths)
     def __getitem__(self, i):
-        img = Image.open(self.img_paths[i]).convert('L')
+        img = Image.open(self.img_paths[i]).convert('RGB')
         img = self.transform(img)
         if self.labels is not None:
             return img, torch.tensor(self.labels[i], dtype=torch.float32)
@@ -70,7 +71,10 @@ if __name__ == "__main__":
 
     # 資料分割
     img_dir = Path("vit_ecg_images")
-    img_paths = sorted(img_dir.glob("**/*12lead*.png"))
+    img_paths = [
+        p for p in img_dir.glob("**/*12lead*.png")
+        if "cwt" in p.name
+    ]
     train_paths, test_paths, train_labels, test_labels = train_test_split(
         img_paths, labels_prob, test_size=0.1, random_state=42
     )
@@ -85,7 +89,7 @@ if __name__ == "__main__":
     # 模型
     num_classes = len(all_names)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = timm.create_model('vit_small_patch16_dinov3.lvd1689m', in_chans=1)
+    model = timm.create_model('vit_small_patch16_dinov3_qkvb.lvd1689m', pretrained=True, num_classes=0)
     num_features = model.num_features
     model.head = nn.Linear(num_features, num_classes)
     model.to(device)
@@ -97,7 +101,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # 訓練
-    num_epochs = 20
+    num_epochs = 30
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -114,7 +118,9 @@ if __name__ == "__main__":
     # 測試
     model.eval()
     test_loss = 0.0
-    all_preds, all_labels_list = [], []
+    all_probs = []
+    all_preds = []
+    all_labels_list = []
 
     with torch.no_grad():
         for imgs, labels in test_loader:
@@ -122,15 +128,16 @@ if __name__ == "__main__":
             outputs = model(imgs)
             loss = criterion(outputs, labels)
             test_loss += loss.item() * imgs.size(0)
-            binary_preds = torch.sigmoid(outputs) > 0.5
-            binary_labels = labels > 0.5
-            all_preds.append(binary_preds.cpu().numpy())
-            all_labels_list.append(binary_labels.cpu().numpy())
+            probs = torch.sigmoid(outputs)
+
+            all_probs.append(probs.cpu().numpy())
+            all_preds.append((probs > 0.5).cpu().numpy())
+            all_labels_list.append((labels > 0.5).cpu().numpy())
 
     test_loss /= len(test_dataset)
     all_preds = np.vstack(all_preds)
     all_labels_list = np.vstack(all_labels_list)
-    accuracy = (all_preds == all_labels_list).mean()
+    accuracy = accuracy_score(all_labels_list, all_preds)
 
     print(f"Test Loss: {test_loss:.4f}, Accuracy: {accuracy:.4f}")
 
@@ -145,5 +152,5 @@ if __name__ == "__main__":
         'test_loss': test_loss,
         'test_accuracy': accuracy,
         'label_names': all_names,
-    }, save_dir / 'ecg_vit_model_v3.pth')
-    print(f"Model saved at {save_dir / 'ecg_vit_model_v2.pth'}")
+    }, save_dir / 'ecg_vit_model_v8.pth')
+    print(f"Model saved at {save_dir / 'ecg_vit_model_v8.pth'}")
