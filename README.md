@@ -14,13 +14,15 @@
 
 ```
 .
-├── ecg_image_generator.py  # 處理原始 ECG 資料並生成 CWT 影像的腳本
-├── ecg_train.py            # 訓練 ViT 模型的腳本
-├── ecg_eval.py             # 評估已訓練模型的腳本
-├── requirements.txt        # Python 相依套件列表
-├── ecg_models/             # 儲存訓練好的模型目錄(此部分容量超過github上限，另放在https://drive.google.com/drive/folders/1tM3R6hCHCNamfD-4ZcnQmtnL1Aq2bfz2?usp=drive_link)
-├── vit_ecg_images/         # 儲存生成影像的目錄 (此部分超出github上限，可使用ecg_image_generator.py來產生)
-└── ptb-xl-.../             # (外部) PTB-XL 資料集目錄 (此部分超出github上限，可到https://physionet.org/content/ptb-xl/1.0.3/下載)
+├── ecg_image_generator.py  # 處理原始 ECG 資料並生成 CWT 影像的程式
+├── ecg_train.py            # 訓練 ViT 模型的程式
+├── ecg_eval.py             # 評估已訓練模型的程式
+├── test_predict.py         # 用來展示predict_ecg函式的使用
+├── requirements.txt        # Python 相依套件清單
+├── venv/                   # Python 虛擬環境（此資料夾容量較大，超過 GitHub 上限，可用 requirements.txt 重新建立環境）     
+├── ecg_models/             # 儲存訓練好的模型（此資料夾容量較大，超過 GitHub 上限，可從 Google Drive 下載：https://drive.google.com/drive/folders/1tM3R6hCHCNamfD-4ZcnQmtnL1Aq2bfz2?usp=drive_link）
+├── vit_ecg_images/         # 儲存生成的 ECG 影像（此資料夾容量較大，可用 ecg_image_generator.py 產生影像）
+└── ptb-xl-.../             # (外部) PTB-XL 資料集目錄（此部分需自行下載，可至 https://physionet.org/content/ptb-xl/1.0.3/）
 ```
 
 ## 🛠️ 安裝說明
@@ -70,3 +72,7 @@ python ecg_eval.py
 - 載入訓練好的模型。
 - 計算 **Accuracy (準確率)**、**F1-Score** 和 **AUROC**。
 - 對範例影像進行預測並輸出結果。
+
+## 🧪 專案使用說明
+
+ecg_eval.py 中的 predict_ecg(img_path, model, label_names, device, threshold=0.5) 函式會回傳機率高於設定 threshold 的標籤與對應機率。使用方式可以參考test_predict.py。
