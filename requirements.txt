@@ -7,3 +7,7 @@ matplotlib
 scipy
 wfdb
 neurokit2
+
+torch 
+torchvision 
+torchaudio
