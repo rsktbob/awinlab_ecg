@@ -35,7 +35,7 @@ def predict_ecg(img_path, model, label_names, device, threshold=0.5):
 if __name__ == "__main__":
     # --- 載入模型 ---
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load("ecg_models/vit_small_plus_dinov3_30.pth", map_location=device, weights_only=False)
+    checkpoint = torch.load("ecg_models/vit_small_plus_dinov3_30_v2.pth", map_location=device, weights_only=False)
 
     label_names = checkpoint['label_names']
     num_classes = len(label_names)

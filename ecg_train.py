@@ -89,7 +89,7 @@ if __name__ == "__main__":
     # 模型
     num_classes = len(all_names)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = timm.create_model('vit_small_patch16_dinov3.lvd1689m', pretrained=True, num_classes=0)
+    model = timm.create_model('vit_small_plus_patch16_dinov3.lvd1689m', pretrained=True, num_classes=0)
     num_features = model.num_features
     model.head = nn.Linear(num_features, num_classes)
     model.to(device)
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # 訓練
-    num_epochs = 30
+    num_epochs = 50
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -152,5 +152,5 @@ if __name__ == "__main__":
         'test_loss': test_loss,
         'test_accuracy': accuracy,
         'label_names': all_names,
-    }, save_dir / 'ecg_vit_model_v8.pth')
-    print(f"Model saved at {save_dir / 'ecg_vit_model_v8.pth'}")
+    }, save_dir / 'vit_small_plus_dinov3_30_v2.pth')
+    print(f"Model saved at {save_dir / 'vit_small_plus_dinov3_30_v2.pth'}")

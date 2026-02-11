@@ -28,85 +28,54 @@ import wfdb
 import neurokit2 as nk
 import pywt
 
+
 # ===================== 工具函數 =====================
 
-def align_image_to_16(img):
-    """將圖片尺寸對齊到 16 的倍數 (支援 L 和 RGB 模式)"""
-    w, h = img.size
-    new_w = (w + 15) // 16 * 16
-    new_h = (h + 15) // 16 * 16
-    
-    fill_color = "white" if img.mode == "L" else "black"
-    padded_img = Image.new(img.mode, (new_w, new_h), fill_color)
-    padded_img.paste(img, (0, 0))
-    return padded_img
-
-
 def save_figure_to_file(fig, filepath, mode='L'):
-    """儲存 matplotlib figure 到檔案，並自動 16 對齊"""
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
+    """儲存 matplotlib figure 到檔案"""
+    plt.tight_layout(pad=0)
+    fig.savefig(filepath, format='png', bbox_inches='tight', pad_inches=0)
     plt.close(fig)
-    
-    buf.seek(0)
-    img = Image.open(buf).convert(mode)
-    img_aligned = align_image_to_16(img)  # 自動對齊到 16 的倍數
-    img_aligned.save(filepath)
 
 
 def setup_clean_axes(ax):
-    """設定乾淨的座標軸（無刻度、無邊框）"""
+    """設定乾淨的座標軸"""
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
     ax.margins(x=0, y=0)
 
-# ===================== ECG 設定 =====================
-
-class ECGPlotConfig:
-    SEC_PER_INCH = 0.5
-    HEIGHT_PER_LEAD = 0.6
-    SEC_PER_INCH_COMPACT = 0.5
-    HEIGHT_PER_LEAD_COMPACT = 0.5
-    LINE_WIDTH = 0.8
-    LINE_COLOR = 'black'
-
-
 # ===================== ECG 波形函數 =====================
 
-def wf_draw_single_lead(time, signal, figsize, dpi=64):
+def wf_draw_single_lead(time, signal, figsize, dpi=32):
     """繪製單一 lead 的 ECG 波形"""
     fig = plt.figure(figsize=figsize, dpi=dpi)
     ax = fig.add_subplot(111)
     
-    ax.plot(time, signal, color=ECGPlotConfig.LINE_COLOR, linewidth=ECGPlotConfig.LINE_WIDTH)
+    ax.plot(time, signal, color='black', linewidth=0.8)
     setup_clean_axes(ax)
-    plt.tight_layout(pad=0)
     
     return fig
 
 
-def wf_draw_combined_leads(time, ecg_data, dpi=64):
-    """繪製多個 leads 在同一張圖"""
+def wf_draw_combined_leads(time, ecg_data, dpi=32):
+    """繪製多個 leads 在同一張圖，不拉伸，消除縫隙"""
     n_leads = ecg_data.shape[1]
-    fig_width = max(3, time[-1] * ECGPlotConfig.SEC_PER_INCH)
-    fig_height = n_leads * ECGPlotConfig.HEIGHT_PER_LEAD
     
-    fig, axes = plt.subplots(n_leads, 1, figsize=(fig_width, fig_height), sharex=True, dpi=dpi)
+    fig, axes = plt.subplots(n_leads, 1, figsize=(10, 14), sharex=True, dpi=dpi)
     axes = axes if n_leads > 1 else [axes]
     
-    for i, ax in enumerate(axes):
-        ax.plot(time, ecg_data[:, i], color=ECGPlotConfig.LINE_COLOR, linewidth=ECGPlotConfig.LINE_WIDTH)
-        setup_clean_axes(ax)
+    fig.subplots_adjust(hspace=0)
     
-    plt.subplots_adjust(hspace=0)
-    plt.tight_layout(pad=0)
+    for i, ax in enumerate(axes):
+        ax.plot(time, ecg_data[:, i], color='black', linewidth=0.8)
+        setup_clean_axes(ax)
     
     return fig
 
 
-def wf_draw_image(time, ecg_data, path, mode="combined", lead_names=None, height_per_lead=None, sec_per_inch=None, dpi=64):
+def wf_draw_image(time, ecg_data, path, mode="combined", lead_names=None, height_per_lead=None, sec_per_inch=None, dpi=32):
     """生成 ECG 波形圖並儲存"""
     n_leads = ecg_data.shape[1]
     
@@ -138,7 +107,7 @@ def cwt_compute(signal, scales=None, wavelet='mexh'):
     return coef
 
 
-def cwt_draw_single_image(coef, save_path, dpi=64, cmap='turbo'):
+def cwt_draw_single_image(coef, dpi=32, cmap='turbo'):
     """儲存單一 CWT 圖片"""
     H, W = coef.shape
     ratio = H / W
@@ -149,54 +118,51 @@ def cwt_draw_single_image(coef, save_path, dpi=64, cmap='turbo'):
     ax = fig.add_subplot(111)
     ax.imshow(coef, aspect='equal', origin='lower', cmap=cmap)
     ax.axis('off')
-    plt.tight_layout(pad=0)
     
+    return fig
     save_figure_to_file(fig, save_path, mode='RGB')
 
 
-def cwt_draw_combined_image(coef_list, save_path, dpi=64, cmap='turbo'):
+def cwt_draw_combined_image(coef_list, dpi=32, cmap='turbo'):
     """儲存多個 leads 合併的 CWT 圖"""
     n_leads = len(coef_list)
-    H, W = coef_list[0].shape
-    ratio = H / W
-    fig_w = 5
-    fig_h = fig_w * ratio * n_leads
     
-    fig, axes = plt.subplots(n_leads, 1, figsize=(fig_w, fig_h), dpi=dpi)
+    fig, axes = plt.subplots(n_leads, 1, figsize=(12, 15), dpi=dpi)
     axes = axes if n_leads > 1 else [axes]
     
+    fig.subplots_adjust(hspace=0)
+
     for ax, coef in zip(axes, coef_list):
-        ax.imshow(coef, aspect='equal', origin='lower', cmap=cmap)
-        ax.axis('off')
-    
-    plt.subplots_adjust(hspace=0)
-    plt.tight_layout(pad=0)
-    save_figure_to_file(fig, save_path, mode='RGB')
+        ax.imshow(coef, aspect='auto', origin='lower', cmap=cmap)
+        setup_clean_axes(ax)
+
+    return fig
 
 
-def cwt_draw_images(ecg_data, lead_names, path, mode="combined", dpi=64, cmap='turbo'):
+
+def cwt_draw_images(ecg_data, lead_names, path, mode="combined", dpi=32, cmap='turbo'):
     """計算並儲存 CWT 圖片"""
     scales = np.arange(1, 128)
     
     coef_list = [cwt_compute(ecg_data[:, i], scales) for i in range(ecg_data.shape[1])]
     
     if mode == "combined":
-        # 直接使用傳入的 path，檔名加上 _cwt
+        fig = cwt_draw_combined_image(coef_list, dpi=dpi, cmap=cmap)
         cwt_path = Path(path).parent / f"{Path(path).stem}_cwt.png"
-        cwt_draw_combined_image(coef_list, cwt_path, dpi=dpi, cmap=cmap)
+        save_figure_to_file(fig, cwt_path, mode='RGB')
         return cwt_path
     else:
-        # 和 wf_draw_image 一樣的邏輯
         paths = []
         for i, coef in enumerate(coef_list):
             lead_name = lead_names[i] if lead_names else f"lead{i}"
+            fig = cwt_draw_single_image(coef, dpi=dpi, cmap=cmap)
             file_path = Path(path).parent / f"{Path(path).stem}_cwt_{lead_name}.png"
-            cwt_draw_single_image(coef, file_path, dpi=dpi, cmap=cmap)
+            save_figure_to_file(fig, file_path, mode='RGB')
             paths.append(file_path)
         return paths
 
 
-# ===================== ECG 讀取與處理 =====================
+# ===================== ECG 讀取與處理 ============
 
 def ecg_load_and_clean(root_dir, filename):
     """讀取 ECG 並使用 NeuroKit2 清洗"""
@@ -211,7 +177,7 @@ def ecg_load_and_clean(root_dir, filename):
     return ecg_cleaned, time, leads, fs
 
 
-def ecg_plot(root_dir, filename, mode="combined", use_cwt=False, dpi=64):
+def ecg_plot(root_dir, filename, mode="combined", use_cwt=False, dpi=32):
     """完整 ECG 波形與 CWT 圖生成流程"""
     out_dir = Path("vit_ecg_images") / filename
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -244,7 +210,7 @@ def ecg_process_record(task, mode="combined", use_cwt=False):
 
 
 if __name__ == "__main__":
-    root_dir = Path("ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records100/")
+    root_dir = Path("ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records500/")
 
     mode = "combined"
     tasks = []
