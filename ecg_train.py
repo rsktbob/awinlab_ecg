@@ -11,6 +11,8 @@ from pathlib import Path
 import ast
 from sklearn.model_selection import train_test_split
 import numpy as np
+import wfdb
+
 
 # Dataset
 class ECGDataset(Dataset):
@@ -23,121 +25,120 @@ class ECGDataset(Dataset):
         ])
     def __len__(self): 
         return len(self.img_paths)
-    def __getitem__(self, i):
-        img = Image.open(self.img_paths[i]).convert('RGB')
-        img = self.transform(img)
+    def __getitem__(self, idx):
+        image = Image.open(self.img_paths[idx]).convert('RGB')
+        image = self.transform(image)
         if self.labels is not None:
-            return img, torch.tensor(self.labels[i], dtype=torch.float32)
-        return img
+            return image, torch.tensor(self.labels[idx], dtype=torch.float32)
+        return image
 
-# 標籤解析
+
+
+# Load scp_statements.csv for diagnostic aggregation
+agg_df = pd.read_csv('ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/scp_statements.csv', index_col=0)
+agg_df = agg_df[agg_df.diagnostic == 1]
+
+
 def parse_scp_codes_with_probs(s):
-    try:
-        d = ast.literal_eval(s)
-        d = {k: v for k, v in d.items() if v > 0}
-        return d if d else {'NORM': 100.0}
-    except:
-        return {'NORM': 100.0}
+    d = ast.literal_eval(s)
+    d = {k: v for k, v in d.items() if v > 0}
+    return d
 
-def predict_accuracy(label_positions, predicted_probs, true_labels):
-    threshold = 0.5
-    correct_count = 0
-    
-    for label in true_labels:
-        pos = label_positions[label]
-        predicted_value = predicted_probs[pos]
-        true_value = true_labels[label]
-        
-        predicted_class = 1 if predicted_value > threshold else 0
-        true_class = 1 if true_value > threshold / 100 else 0
-        
-        if predicted_class == true_class:
-            correct_count += 1
-    
-    return correct_count
-
-
+def aggregate_diagnostic_superclass(y_dic):
+    tmp = {}
+    for key, value in y_dic.items():
+        if key in agg_df.index:
+            if value > 0:
+                tmp[agg_df.loc[key].diagnostic_class] = value
+    return tmp
 
 if __name__ == "__main__":
-    # 標籤與機率向量
-    df = pd.read_csv('ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/ptbxl_database.csv')
-    all_dicts = [parse_scp_codes_with_probs(s) for s in df['scp_codes']]
-    all_names = sorted({k for d in all_dicts for k in d})
-    labels_prob = np.array([
-        [d.get(name, 0)/100.0 for name in all_names] for d in all_dicts
-    ], dtype=np.float32)
-    print(all_names)
-    all_name_pos = {name : i for i, name in enumerate(all_names)}
+    # load and convert annotation data
+    df = pd.read_csv('ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/ptbxl_database.csv', index_col='ecg_id')
+    df.scp_codes = df.scp_codes.apply(lambda x: ast.literal_eval(x))
 
-    # 資料分割
-    img_dir = Path("vit_ecg_images")
-    img_paths = [
-        p for p in img_dir.glob("**/*12lead*.png")
-        if "cwt" in p.name
-    ]
-    train_paths, test_paths, train_labels, test_labels = train_test_split(
+
+    # Apply diagnostic superclass
+    df['diagnostic_superclass'] = df.scp_codes.apply(aggregate_diagnostic_superclass)
+    df = df[df.diagnostic_superclass.map(lambda x: len(x)) > 0]
+    class_names = ['NORM', 'MI', 'STTC', 'CD', 'HYP']
+
+
+    # Load x data path
+    img_paths = []
+    for path in df['filename_lr']:
+        img_paths.append(Path("vit_ecg_images/lr/cwt") / f"{Path(path).stem}_12lead_vit_cwt.png")
+
+    # Load y
+    labels_prob = np.array([
+            [d.get(name, 0)/100.0 for name in class_names] for d in df['diagnostic_superclass']
+        ], dtype=np.float32)
+
+
+    train_img_paths, test_img_paths, train_labels, test_labels = train_test_split(
         img_paths, labels_prob, test_size=0.1, random_state=42
     )
 
-    train_dataset = ECGDataset(train_paths, labels=train_labels)
-    test_dataset = ECGDataset(test_paths, labels=test_labels)
+    train_dataset = ECGDataset(train_img_paths, labels=train_labels)
+    test_dataset = ECGDataset(test_img_paths, labels=test_labels)
 
     # DataLoader
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=0, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=0, pin_memory=True)
 
     # 模型
-    num_classes = len(all_names)
+    num_classes = len(class_names)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = timm.create_model('vit_small_plus_patch16_dinov3.lvd1689m', pretrained=True, num_classes=0)
     num_features = model.num_features
     model.head = nn.Linear(num_features, num_classes)
     model.to(device)
-    
+
 
     # 損失與優化
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     torch.backends.cudnn.benchmark = True
 
+
     # 訓練
-    num_epochs = 50
+    num_epochs = 30
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
-        for imgs, labels in train_loader:
-            imgs, labels = imgs.to(device), labels.to(device)
+        for batch_images, batch_labels in train_loader:
+            batch_images, batch_labels = batch_images.to(device), batch_labels.to(device)
             optimizer.zero_grad()
-            outputs = model(imgs)
-            loss = criterion(outputs, labels)
+            logits = model(batch_images)
+            loss = criterion(logits, batch_labels)
             loss.backward()
             optimizer.step()
-            running_loss += loss.item() * imgs.size(0)
+            running_loss += loss.item() * batch_images.size(0)
         print(f"Epoch [{epoch+1}/{num_epochs}] - Loss: {running_loss / len(train_dataset):.4f}")
 
     # 測試
     model.eval()
     test_loss = 0.0
-    all_probs = []
-    all_preds = []
-    all_labels_list = []
+    predicted_probs = []
+    predicted_binary_labels = []
+    true_binary_labels = []
 
     with torch.no_grad():
-        for imgs, labels in test_loader:
-            imgs, labels = imgs.to(device), labels.to(device)
-            outputs = model(imgs)
-            loss = criterion(outputs, labels)
-            test_loss += loss.item() * imgs.size(0)
-            probs = torch.sigmoid(outputs)
+        for batch_images, batch_labels in test_loader:
+            batch_images, batch_labels = batch_images.to(device), batch_labels.to(device)
+            logits = model(batch_images)
+            loss = criterion(logits, batch_labels)
+            test_loss += loss.item() * batch_images.size(0)
+            prob = torch.sigmoid(logits)
 
-            all_probs.append(probs.cpu().numpy())
-            all_preds.append((probs > 0.5).cpu().numpy())
-            all_labels_list.append((labels > 0.5).cpu().numpy())
+            predicted_probs.append(prob.cpu().numpy())
+            predicted_binary_labels.append((prob > 0.5).cpu().numpy())
+            true_binary_labels.append((batch_labels > 0.5).cpu().numpy())
 
     test_loss /= len(test_dataset)
-    all_preds = np.vstack(all_preds)
-    all_labels_list = np.vstack(all_labels_list)
-    accuracy = accuracy_score(all_labels_list, all_preds)
+    predicted_binary_labels = np.vstack(predicted_binary_labels)
+    true_binary_labels = np.vstack(true_binary_labels)
+    accuracy = accuracy_score(true_binary_labels, predicted_binary_labels)
 
     print(f"Test Loss: {test_loss:.4f}, Accuracy: {accuracy:.4f}")
 
@@ -151,6 +152,5 @@ if __name__ == "__main__":
         'train_loss': running_loss / len(train_dataset),
         'test_loss': test_loss,
         'test_accuracy': accuracy,
-        'label_names': all_names,
-    }, save_dir / 'vit_small_plus_dinov3_30_v2.pth')
-    print(f"Model saved at {save_dir / 'vit_small_plus_dinov3_30_v2.pth'}")
+        'super_classes': class_names,
+    }, save_dir / 'vit_small_plus_dinov3_30_v5.pth')

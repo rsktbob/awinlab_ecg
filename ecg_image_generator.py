@@ -31,7 +31,7 @@ import pywt
 
 # ===================== 工具函數 =====================
 
-def save_figure_to_file(fig, filepath, mode='L'):
+def save_figure_to_file(fig, filepath):
     """儲存 matplotlib figure 到檔案"""
     plt.tight_layout(pad=0)
     fig.savefig(filepath, format='png', bbox_inches='tight', pad_inches=0)
@@ -48,9 +48,9 @@ def setup_clean_axes(ax):
 
 # ===================== ECG 波形函數 =====================
 
-def wf_draw_single_lead(time, signal, figsize, dpi=32):
+def wf_draw_single_lead(time, signal, dpi=32):
     """繪製單一 lead 的 ECG 波形"""
-    fig = plt.figure(figsize=figsize, dpi=dpi)
+    fig = plt.figure(figsize=(10, 2), dpi=dpi)
     ax = fig.add_subplot(111)
     
     ax.plot(time, signal, color='black', linewidth=0.8)
@@ -75,24 +75,29 @@ def wf_draw_combined_leads(time, ecg_data, dpi=32):
     return fig
 
 
-def wf_draw_image(time, ecg_data, path, mode="combined", lead_names=None, height_per_lead=None, sec_per_inch=None, dpi=32):
+def wf_draw_image(time, ecg_data, lead_names, filename, resolution, mode="combined", dpi=32):
     """生成 ECG 波形圖並儲存"""
     n_leads = ecg_data.shape[1]
-    
+
     if mode == "combined":
+        output_dir = Path("vit_ecg_images") / resolution / "wf"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filepath = output_dir / f"{filename}_12lead_vit.png"
         fig = wf_draw_combined_leads(time, ecg_data, dpi=dpi)
-        save_figure_to_file(fig, path)
-        return path
+        save_figure_to_file(fig, filepath)
+        return output_dir
     else:
         paths = []
-        figsize = (max(3, time[-1] * sec_per_inch), height_per_lead)
-        
+        output_dir = Path("vit_ecg_images") / resolution / "wf" / Path(filename)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
         for i in range(n_leads):
-            fig = wf_draw_single_lead(time, ecg_data[:, i], figsize, dpi=dpi)
+            fig = wf_draw_single_lead(time, ecg_data[:, i], dpi=dpi)
             lead_name = lead_names[i] if lead_names else f"lead{i}"
-            file_path = Path(path).parent / f"{Path(path).stem}_{lead_name}.png"
-            save_figure_to_file(fig, file_path)
-            paths.append(file_path)
+            filepath = output_dir / f"{filename}_{lead_name}.png"
+            
+            save_figure_to_file(fig, filepath)
+            paths.append(filepath)
         
         return paths
 
@@ -108,15 +113,10 @@ def cwt_compute(signal, scales=None, wavelet='mexh'):
 
 
 def cwt_draw_single_image(coef, dpi=32, cmap='turbo'):
-    """儲存單一 CWT 圖片"""
-    H, W = coef.shape
-    ratio = H / W
-    fig_w = 5
-    fig_h = fig_w * ratio
-    
-    fig = plt.figure(figsize=(fig_w, fig_h), dpi=dpi)
+    """儲存單一 CWT 圖片"""    
+    fig = plt.figure(figsize=(10, 2), dpi=dpi)
     ax = fig.add_subplot(111)
-    ax.imshow(coef, aspect='equal', origin='lower', cmap=cmap)
+    ax.imshow(coef, aspect='auto', origin='lower', cmap=cmap)
     ax.axis('off')
     
     return fig
@@ -127,7 +127,7 @@ def cwt_draw_combined_image(coef_list, dpi=32, cmap='turbo'):
     """儲存多個 leads 合併的 CWT 圖"""
     n_leads = len(coef_list)
     
-    fig, axes = plt.subplots(n_leads, 1, figsize=(12, 15), dpi=dpi)
+    fig, axes = plt.subplots(n_leads, 1, figsize=(14, 12), dpi=dpi)
     axes = axes if n_leads > 1 else [axes]
     
     fig.subplots_adjust(hspace=0)
@@ -140,7 +140,7 @@ def cwt_draw_combined_image(coef_list, dpi=32, cmap='turbo'):
 
 
 
-def cwt_draw_images(ecg_data, lead_names, path, mode="combined", dpi=32, cmap='turbo'):
+def cwt_draw_image(ecg_data, lead_names, filename, resolution, mode="combined", dpi=32, cmap='turbo'):
     """計算並儲存 CWT 圖片"""
     scales = np.arange(1, 128)
     
@@ -148,17 +148,21 @@ def cwt_draw_images(ecg_data, lead_names, path, mode="combined", dpi=32, cmap='t
     
     if mode == "combined":
         fig = cwt_draw_combined_image(coef_list, dpi=dpi, cmap=cmap)
-        cwt_path = Path(path).parent / f"{Path(path).stem}_cwt.png"
-        save_figure_to_file(fig, cwt_path, mode='RGB')
-        return cwt_path
+        output_dir = Path("vit_ecg_images") / resolution / "cwt"
+        # output_dir.mkdir(parents=True, exist_ok=True)
+        filepath = output_dir / f"{filename}_12lead_vit_cwt.png"
+        save_figure_to_file(fig, filepath)
+        return filepath
     else:
         paths = []
         for i, coef in enumerate(coef_list):
             lead_name = lead_names[i] if lead_names else f"lead{i}"
             fig = cwt_draw_single_image(coef, dpi=dpi, cmap=cmap)
-            file_path = Path(path).parent / f"{Path(path).stem}_cwt_{lead_name}.png"
-            save_figure_to_file(fig, file_path, mode='RGB')
-            paths.append(file_path)
+            output_dir = Path("vit_ecg_images") / resolution / "cwt" / Path(filename)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            filepath = output_dir / f"{filename}_{lead_name}.png"
+            save_figure_to_file(fig, filepath)
+            paths.append(filepath)
         return paths
 
 
@@ -177,40 +181,33 @@ def ecg_load_and_clean(root_dir, filename):
     return ecg_cleaned, time, leads, fs
 
 
-def ecg_plot(root_dir, filename, mode="combined", use_cwt=False, dpi=32):
+def ecg_plot(root_dir, filename, resolution, mode="combined", use_cwt=False, dpi=32):
     """完整 ECG 波形與 CWT 圖生成流程"""
-    out_dir = Path("vit_ecg_images") / filename
-    out_dir.mkdir(parents=True, exist_ok=True)
-    
-    ecg_cleaned, time, leads, fs = ecg_load_and_clean(root_dir, filename)
-    
-    stem = Path(filename).stem
-    if mode == "combined":
-        final_path = out_dir / f"{stem}_12lead_vit.png"
-    else:
-        final_path = out_dir / f"{stem}.png"
-        
+    ecg_cleaned, time, lead_names, fs = ecg_load_and_clean(root_dir, filename)
+            
     if use_cwt:
-        cwt_draw_images(ecg_cleaned, leads, final_path, mode=mode, dpi=dpi)
+        cwt_draw_image(ecg_cleaned, lead_names=lead_names, filename=filename, resolution=resolution, mode=mode, dpi=dpi)
     else:
-        wf_draw_image(time, ecg_cleaned, final_path, mode=mode, lead_names=leads, dpi=dpi)
+        wf_draw_image(time, ecg_cleaned, lead_names=lead_names, filename=filename, resolution=resolution, mode=mode, dpi=dpi)
 
     
-    return final_path
+    return filename
 
 
-def ecg_process_record(task, mode="combined", use_cwt=False):
+def ecg_process(task, resolution, mode="combined", use_cwt=False):
     """處理單筆 ECG 檔案"""
-    path, filename = task
+    root_dir, filename = task
     try:
-        ecg_plot(path, filename, mode, use_cwt=use_cwt)
+        ecg_plot(root_dir, filename, resolution, mode, use_cwt=use_cwt)
         return f"✅ Finished {filename}"
     except Exception as e:
         return f"❌ Error {filename}: {e}"
 
 
 if __name__ == "__main__":
-    root_dir = Path("ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/records500/")
+    resolution = "lr"
+    root_dir = "ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/"
+    root_dir = Path(root_dir + "records100") if resolution == "lr" else Path(root_dir + "records500")
 
     mode = "combined"
     tasks = []
@@ -222,6 +219,6 @@ if __name__ == "__main__":
                     tasks.append((patient_dir, filename))
 
     with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(ecg_process_record, task, mode, use_cwt=True) for task in tasks]
+        futures = [executor.submit(ecg_process, task, resolution, mode, use_cwt=True) for task in tasks]
         for future in as_completed(futures):
             print(future.result())
