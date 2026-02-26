@@ -10,3 +10,4 @@ neurokit2
 torch 
 torchvision 
 torchaudio
+transformers

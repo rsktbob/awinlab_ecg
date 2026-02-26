@@ -149,7 +149,6 @@ def cwt_draw_image(ecg_data, lead_names, filename, resolution, mode="combined", 
     if mode == "combined":
         fig = cwt_draw_combined_image(coef_list, dpi=dpi, cmap=cmap)
         output_dir = Path("vit_ecg_images") / resolution / "cwt"
-        # output_dir.mkdir(parents=True, exist_ok=True)
         filepath = output_dir / f"{filename}_12lead_vit_cwt.png"
         save_figure_to_file(fig, filepath)
         return filepath
@@ -205,7 +204,7 @@ def ecg_process(task, resolution, mode="combined", use_cwt=False):
 
 
 if __name__ == "__main__":
-    resolution = "lr"
+    resolution = "hr"
     root_dir = "ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/"
     root_dir = Path(root_dir + "records100") if resolution == "lr" else Path(root_dir + "records500")
 
@@ -218,7 +217,7 @@ if __name__ == "__main__":
                     filename = record_file.stem
                     tasks.append((patient_dir, filename))
 
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(max_workers=5) as executor:
         futures = [executor.submit(ecg_process, task, resolution, mode, use_cwt=True) for task in tasks]
         for future in as_completed(futures):
             print(future.result())

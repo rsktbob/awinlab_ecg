@@ -12,13 +12,12 @@ import numpy as np
 import wfdb
 from sklearn.metrics import accuracy_score
 from timm.data import create_transform
-from ecg_tool import ECGDataset, aggregate_diagnostic_superclass, prepare_data, evaluate_multilabel, train_model
-
+from ecg_tool import ECGDataset, aggregate_diagnostic_superclass, prepare_data, evaluate_singlelabel, train_model
 
 
 
 if __name__ == "__main__":
-    # 資料類別
+        # 資料類別
     class_names = ['NORM', 'MI', 'STTC', 'CD', 'HYP']
 
     # 模型
@@ -31,19 +30,25 @@ if __name__ == "__main__":
                               attn_drop_rate=0.1)
     num_features = model.num_features
     model.head = nn.Sequential(
-        nn.Linear(num_features, 512),       
-        nn.LayerNorm(512),                  
-        nn.GELU(),                          
-        nn.Dropout(0.3),                    
-        nn.Linear(512, num_classes)         
+        nn.Linear(num_features, 512),       # 第一層：擴展特徵空間
+        nn.LayerNorm(512),                  # 歸一化，讓訓練更穩定
+        nn.GELU(),                          # 比 ReLU 更適合 Transformer 的激活函數
+        nn.Dropout(0.3),                    # 防止 20,000 筆資料過擬合
+        nn.Linear(512, num_classes)         # 第二層：輸出多標籤 Logits
     )
     model.to(device)
 
     # 預訓練模型的數據
-    data_config = timm.data.resolve_model_data_config(model)
+    data_config = model.pretrained_cfg
+
     
     train_transform = create_transform(
-        **data_config,
+        input_size=data_config['input_size'],
+        interpolation=data_config['interpolation'],
+        mean=data_config['mean'],
+        std=data_config['std'],
+        crop_pct=data_config.get('crop_pct', None),
+        crop_mode=data_config.get('crop_mode', None),
         is_training=True,
         hflip=0.0,
         vflip=0.0,
@@ -52,14 +57,17 @@ if __name__ == "__main__":
     )
 
     test_transform = create_transform(
-        **data_config,
-        is_training=False,
+        input_size=data_config['input_size'],
+        interpolation=data_config['interpolation'],
+        mean=data_config['mean'],
+        std=data_config['std'],
+        crop_pct=data_config.get('crop_pct', None),
+        crop_mode=data_config.get('crop_mode', None),
+        is_training=False
     )
 
-    print(model)
-
     # 訓練/測試切分
-    train_img_paths, test_img_paths, train_labels, test_labels = prepare_data(is_single_label=False, class_names=class_names)
+    train_img_paths, test_img_paths, train_labels, test_labels = prepare_data(is_single_label=True, class_names=class_names)
 
     # 準備資料集
     train_dataset = ECGDataset(
@@ -78,39 +86,29 @@ if __name__ == "__main__":
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=0, pin_memory=True)
     test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=0, pin_memory=True)
 
-    # 計算 pos_weight
-    labels_np = np.array(train_labels) 
-    pos = labels_np.sum(axis=0)
-    neg = labels_np.shape[0] - pos
-    pos_weight = torch.sqrt(torch.tensor(neg / (pos + 1e-6), dtype=torch.float32)).to(device)
-
-    print("pos_weight per class:", pos_weight)
 
     # 損失與優化
-    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=5e-5, weight_decay=0.05)
     torch.backends.cudnn.benchmark = True
 
     # 訓練
-    num_epochs = 40
-    freeze_epochs = 10
+    num_epochs = 20
+    freeze_epochs = 5
 
     train_loss = train_model(model, device, criterion, train_loader, num_epochs, freeze_epochs)
 
     # 測試
-    accuracy, f1_macro, auroc_macro, test_loss, model_report = evaluate_multilabel(model, criterion, test_loader, device, class_names)
-    print(f"最終測試損失: {test_loss:.4f}")
- 
+    test_loss = evaluate_singlelabel(model, criterion, test_loader, device, class_names)
+
     # 保存模型
     save_dir = Path("ecg_models")
     save_dir.mkdir(exist_ok=True)
     torch.save({
         'epoch': num_epochs,
         'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
         'train_loss': train_loss,
         'test_loss': test_loss,
         'super_classes': class_names,
-        'accuracy': accuracy,
-        'f1_macro': f1_macro,
-        'auroc_macro': auroc_macro,
-        'model_report': model_report
     }, save_dir / 'vit_small_plus_dinov3_30_v6.pth')
