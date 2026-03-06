@@ -13,11 +13,11 @@ import pandas as pd
 import ast
 from ecg_tool import ECGDataset, aggregate_diagnostic_superclass
 from timm.data import create_transform
-from ecg_tool import load_model, evaluate_multilabel, prepare_data
+from ecg_tool import load_model, evaluate_model, prepare_data
 
 if __name__ == "__main__":
     # 1. 載入模型
-    model_path = Path("ecg_models/vit_small_plus_dinov3_30_v6.pth")
+    model_path = Path("ecg_models/deit3_small_patch16_384_30.pth")
     checkpoint = torch.load(model_path, map_location='cpu')
     
     # 2. 印出基礎資訊

@@ -12,7 +12,7 @@ import numpy as np
 import wfdb
 from sklearn.metrics import accuracy_score
 from timm.data import create_transform
-from ecg_tool import ECGDataset, aggregate_diagnostic_superclass, prepare_data, evaluate_multilabel, train_model
+from ecg_tool import ECGDataset, aggregate_diagnostic_superclass, prepare_data, evaluate_model, train_model
 
 
 
@@ -24,24 +24,26 @@ if __name__ == "__main__":
     # 模型
     num_classes = len(class_names)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = timm.create_model('vit_small_plus_patch16_dinov3.lvd1689m', 
-                              pretrained=True, 
-                              num_classes=0,
-                              drop_rate=0.3,
-                              attn_drop_rate=0.1)
-    num_features = model.num_features
-    model.head = nn.Sequential(
-        nn.Linear(num_features, 512),       
-        nn.LayerNorm(512),                  
-        nn.GELU(),                          
-        nn.Dropout(0.3),                    
-        nn.Linear(512, num_classes)         
-    )
-    model.to(device)
+    model = timm.create_model('deit3_small_patch16_384.fb_in1k',
+                               pretrained=True,
+                               num_classes=0,
+                               drop_rate=0.3,
+                               attn_drop_rate=0.1)
 
+    num_features = model.num_features
+    model.head = nn.Linear(num_features, num_classes)
+    # model.head = nn.Sequential(
+    #     nn.Linear(num_features, 512),       
+    #     nn.LayerNorm(512),                  
+    #     nn.GELU(),                          
+    #     nn.Dropout(0.3),                    
+    #     nn.Linear(512, num_classes)         
+    # )
+    model.to(device)
+    
     # 預訓練模型的數據
     data_config = timm.data.resolve_model_data_config(model)
-    
+
     train_transform = create_transform(
         **data_config,
         is_training=True,
@@ -55,8 +57,6 @@ if __name__ == "__main__":
         **data_config,
         is_training=False,
     )
-
-    print(model)
 
     # 訓練/測試切分
     train_img_paths, test_img_paths, train_labels, test_labels = prepare_data(is_single_label=False, class_names=class_names)
@@ -91,13 +91,13 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # 訓練
-    num_epochs = 40
-    freeze_epochs = 10
+    num_epochs = 30
+    freeze_epochs = 6
 
     train_loss = train_model(model, device, criterion, train_loader, num_epochs, freeze_epochs)
 
     # 測試
-    accuracy, f1_macro, auroc_macro, test_loss, model_report = evaluate_multilabel(model, criterion, test_loader, device, class_names)
+    precision_micro, recall_micro, f1_micro, precision_macro, recall_macro, f1_macro, auroc_macro, test_loss, model_report = evaluate_model(model, criterion, test_loader, device, class_names)
     print(f"最終測試損失: {test_loss:.4f}")
  
     # 保存模型
@@ -109,8 +109,12 @@ if __name__ == "__main__":
         'train_loss': train_loss,
         'test_loss': test_loss,
         'super_classes': class_names,
-        'accuracy': accuracy,
+        'precision_micro': precision_micro,
+        'recall_micro': recall_micro,
+        'f1_micro': f1_micro,
+        'precision_macro': precision_macro,
+        'recall_macro': recall_macro,
         'f1_macro': f1_macro,
         'auroc_macro': auroc_macro,
         'model_report': model_report
-    }, save_dir / 'vit_small_plus_dinov3_30_v6.pth')
+    }, save_dir / 'deit3_small_patch16_384_30.pth')
