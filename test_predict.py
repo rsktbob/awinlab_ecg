@@ -3,6 +3,7 @@ import torch.nn as nn
 import timm
 from ecg_eval import predict_ecg
 from pathlib import Path
+    
 
 if __name__ == "__main__":
     # 1. 設定設備

@@ -1,1 +1,2 @@
-vit_small_plus_patch16_dinov3.lvd1689m, deit3_small_patch16_384.fb_in1k
+vit_small_plus_patch16_dinov3.lvd1689m, deit3_small_patch16_384.fb_in1k, deit_tiny_patch16_224.fb_in1k,
+swin_base_patch4_window7_224.ms_in1k
