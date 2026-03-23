@@ -22,8 +22,8 @@ if __name__ == "__main__":
 
     # 2. 印出基礎資訊
     print(f"訓練回合數 (Epoch): {checkpoint.get('epoch', 'N/A')}")
-    print(f"最終訓練損失 (Train Loss): {checkpoint.get('train_loss', 0):.4f}")
-    print(f"最終測試損失 (Test Loss): {checkpoint.get('test_loss', 0):.4f}")
+    print(f"最終訓練損失 (Train Loss): {checkpoint.get('train_loss_list', 0)}")
+    print(f"最終測試損失 (Test Loss): {checkpoint.get('test_loss_list', 0)}")
     print("-" * 30)
 
     # 3. 印出核心指標

@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 from timm.data import create_transform
 from ecg_tool import ECGDataset, ECGModel, RandomShrinkSignal, prepare_data, evaluate_model, train_model
+from PIL import Image
 from torchvision import transforms  
 
 if __name__ == "__main__":
@@ -20,41 +21,31 @@ if __name__ == "__main__":
     model = ECGModel(model_name='deit3_small_patch16_384.fb_in1k',num_classes=num_classes)
     model.to(device)
     
+
+    print(model.head)
+
     # 預訓練模型的數據
     data_config = timm.data.resolve_model_data_config(model.backbone)
 
-    train_transform = transforms.Compose([
+    train_transform = create_transform(
+        **data_config,
+        is_training=True,
+        hflip=0.0,
+        vflip=0.0,
+        color_jitter=0,
+        scale=(0.6, 1.0), 
+        auto_augment=None,
+    )
 
-        RandomShrinkSignal(
-            num_signals=12,
-            signal_h=16,
-            width=224,
-            scale=(0.6, 1.0)
-        ),
-
-        transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225]
-        )
-    ])
-
-    # train_transform = create_transform(
-    #     **data_config,
-    #     is_training=True,
-    #     hflip=0.0,
-    #     vflip=0.0,
-    #     color_jitter=(0.2, 0.1, 0.2, 0),
-    #     scale=(0.6, 1.0), 
-    #     auto_augment=None,
-    # )
-
-    print(train_transform)
 
     test_transform = create_transform(
         **data_config,
         is_training=False,
     )
 
+    print(test_transform)
+
+    
     # 訓練/測試切分
     train_img_paths, test_img_paths, train_labels, test_labels = prepare_data(class_names=class_names)
 
@@ -72,8 +63,8 @@ if __name__ == "__main__":
     )
 
     # DataLoader
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=6, pin_memory=True, persistent_workers=True)
-    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False, num_workers=6, pin_memory=True,  persistent_workers=True)
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True, num_workers=6, pin_memory=True, persistent_workers=True)
+    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=6, pin_memory=True,  persistent_workers=True)
 
     # 計算 pos_weight
     labels_np = np.array(train_labels) 
@@ -102,8 +93,8 @@ if __name__ == "__main__":
     torch.save({
         'epoch': num_epochs,
         'model_state_dict': model.state_dict(),
-        'train_loss': train_loss_list[num_classes-1],
-        'test_loss': test_loss,
+        'train_loss_list': train_loss_list,
+        'test_loss_list': test_loss_list,
         'super_classes': class_names,
         'precision_micro': precision_micro,
         'recall_micro': recall_micro,
@@ -113,4 +104,4 @@ if __name__ == "__main__":
         'f1_macro': f1_macro,
         'auroc_macro': auroc_macro,
         'model_report': model_report
-    }, save_dir / 'deit3_small_patch16_384_16_v6.pth')
+    }, save_dir / 'deit3_small_patch16_384_16_v5.pth')

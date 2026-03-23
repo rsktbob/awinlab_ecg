@@ -127,7 +127,7 @@ def cwt_draw_combined_image(coef_list, dpi=32, cmap='turbo'):
     """儲存多個 leads 合併的 CWT 圖"""
     n_leads = len(coef_list)
     
-    fig, axes = plt.subplots(n_leads, 1, figsize=(14, 12), dpi=dpi)
+    fig, axes = plt.subplots(n_leads, 1, figsize=(12, 12), dpi=dpi)
     axes = axes if n_leads > 1 else [axes]
     
     fig.subplots_adjust(hspace=0)
@@ -142,10 +142,13 @@ def cwt_draw_combined_image(coef_list, dpi=32, cmap='turbo'):
 
 def cwt_draw_image(ecg_data, lead_names, filename, resolution, mode="combined", dpi=32, cmap='turbo'):
     """計算並儲存 CWT 圖片"""
+    num = int(filename[:5])
+    if num < 8900:
+        return
     scales = np.arange(1, 128)
     
     coef_list = [cwt_compute(ecg_data[:, i], scales) for i in range(ecg_data.shape[1])]
-    
+
     if mode == "combined":
         fig = cwt_draw_combined_image(coef_list, dpi=dpi, cmap=cmap)
         output_dir = Path("vit_ecg_images") / resolution / "cwt"
