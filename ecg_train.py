@@ -9,6 +9,7 @@ from sklearn.metrics import accuracy_score
 from timm.data import create_transform
 from ecg_tool import ECGDataset, ECGModel, RandomShrinkSignal, prepare_data, evaluate_model, train_model
 from PIL import Image
+from torchvision.transforms import InterpolationMode
 from torchvision import transforms  
 
 if __name__ == "__main__":
@@ -42,9 +43,6 @@ if __name__ == "__main__":
         **data_config,
         is_training=False,
     )
-
-    print(test_transform)
-
     
     # 訓練/測試切分
     train_img_paths, test_img_paths, train_labels, test_labels = prepare_data(class_names=class_names)
@@ -104,4 +102,4 @@ if __name__ == "__main__":
         'f1_macro': f1_macro,
         'auroc_macro': auroc_macro,
         'model_report': model_report
-    }, save_dir / 'deit3_small_patch16_384_16_v5.pth')
+    }, save_dir / 'deit3_small_patch16_384_16_v3.pth')

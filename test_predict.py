@@ -9,7 +9,7 @@ from timm.data import create_transform
 if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"使用設備: {device}")
-    model = load_model(model_path='ecg_models/deit3_small_patch16_384_16_v5.pth', 
+    model = load_model(model_path='ecg_models/deit3_small_patch16_384_16_v3.pth', 
                        model_name='deit3_small_patch16_384.fb_in1k',
                        device=device)
     

@@ -5,9 +5,11 @@ from PIL import Image
 import torchvision.transforms.v2 as T
 import pandas as pd
 import timm
+from copy import deepcopy
 from pathlib import Path
 import ast
 from sklearn.model_selection import train_test_split
+from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import numpy as np
 from sklearn.metrics import (
     f1_score, roc_auc_score, precision_score,
@@ -197,84 +199,6 @@ def predict_img(model, device, test_transform, img_path, is_attention_map):
 
     return class_probs
 
-
-# def predict_img(model, device, test_transform, img_path):
-
-#     def reshape_transform(tensor, height=24, width=24):
-#         result = tensor[:, 1:, :].reshape(
-#             tensor.size(0), height, width, tensor.size(2)
-#         )
-#         return result.transpose(2, 3).transpose(1, 2)
-    
-#     def draw_cam_img(img, tensor, cam, class_name, save_path):
-#         class_idx = SUPER_CLASS_NAMES.index(class_name)
-
-#         grayscale_cam = cam(
-#             input_tensor=tensor,
-#             targets=[ClassifierOutputTarget(class_idx)]
-#         )[0]  # (H, W)
-
-#         # 用 PIL image 做 overlay，resize 到跟 CAM 一樣大
-#         h, w = grayscale_cam.shape
-#         pil_resized = img.resize((w, h))
-#         img_np = np.array(pil_resized).astype(np.float32) / 255.0
-
-#         cam_image = show_cam_on_image(img_np, grayscale_cam, use_rgb=True)
-
-#         Image.fromarray(cam_image).save(save_path)
-
-#     # 讀圖
-#     img_path = Path(img_path)
-#     img_idx = img_path.stem[:5]
-#     save_folder = Path('vit_ecg_images/test/') / img_idx
-
-#     img = Image.open(img_path).convert('RGB')
-#     tensor = test_transform(img).unsqueeze(0).to(device)
-
-#     # 推論
-#     model.eval()
-#     with torch.no_grad():
-#         logits = model(tensor)
-#         probs = torch.sigmoid(logits).squeeze(0).cpu().numpy()
-
-#     # 保留超過 50% 的類別
-#     class_probs = [
-#         (class_name, prob)
-#         for class_name, prob in zip(SUPER_CLASS_NAMES, probs)
-#         if prob > 0.5
-#     ]
-    
-#     if len(class_probs) > 0:
-#         os.makedirs(save_folder, exist_ok=True)
-#     else:
-#         return class_probs
-
-#     # GradCAM
-#     cam = GradCAM(
-#         model=model,
-#         target_layers=[model.backbone.blocks[-1].norm1],
-#         reshape_transform=reshape_transform
-#     )
-
-#     # 對每個預測類別畫 CAM
-#     for class_name, prob in class_probs:
-#         save_path = os.path.join(
-#             save_folder, f"{img_idx}_cam_class_{class_name}.png"
-#         )
-        
-#         draw_cam_img(
-#             img=img,
-#             tensor=tensor,
-#             cam=cam,
-#             class_name=class_name,
-#             save_path=save_path
-#         )
-    
-#         print(f'預測結果: {class_name}: {prob:.4f}')
-#         print(f'{img_idx}_cam_{class_name} saved')
-
-#     return class_probs
-
 # 資料準備
 def prepare_data(class_names=SUPER_CLASS_NAMES):
 
@@ -414,10 +338,12 @@ def train_model(model, device, criterion, train_loader, test_loader,
         p.requires_grad = False
 
     optimizer = _build_optimizer(model, frozen=True)
-    scheduler = None
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=freeze_epochs)
     train_loss_list, test_loss_list = [], []
 
     best_loss = float('inf')
+    best_model_wts = deepcopy(model.state_dict())
     counter = 0
 
     for epoch in range(num_epochs):
@@ -430,6 +356,32 @@ def train_model(model, device, criterion, train_loader, test_loader,
             scheduler = optim.lr_scheduler.CosineAnnealingLR(
                 optimizer, T_max=num_epochs - freeze_epochs)
 
+            # warmup_epochs = int(0.1*(num_epochs - freeze_epochs))
+
+            # print(warmup_epochs)
+
+            # # Warmup：從 lr * start_factor 線性升到 lr
+            # warmup_scheduler = LinearLR(
+            #     optimizer,
+            #     start_factor=0.1,
+            #     end_factor=1.0,
+            #     total_iters=warmup_epochs
+            # )
+
+            # # Cosine Annealing：warmup 結束後開始退火
+            # cosine_scheduler = CosineAnnealingLR(
+            #     optimizer,
+            #     T_max=num_epochs - freeze_epochs - warmup_epochs,
+            #     eta_min=1e-6
+            # )
+
+            # # 串接
+            # scheduler = SequentialLR(
+            #     optimizer,
+            #     schedulers=[warmup_scheduler, cosine_scheduler],
+            #     milestones=[warmup_epochs]
+            # )
+
 
         train_loss = train_one_epoch(model, train_loader, device, criterion, optimizer)
         train_loss_list.append(train_loss)
@@ -437,20 +389,19 @@ def train_model(model, device, criterion, train_loader, test_loader,
         test_loss, _, _ = eval_one_epoch(model, test_loader, device, criterion)
         test_loss_list.append(test_loss)
         
-        if scheduler:
-            scheduler.step()
-        
         lrs = [f"{g['lr']:.2e}" for g in optimizer.param_groups]
         print(f"Epoch [{epoch+1:>3}/{num_epochs}] "
               f"Train Loss: {train_loss:.4f}  "
               f"Test Loss: {test_loss:.4f}  "
               f"LRs: {lrs}  ")
 
+        scheduler.step()
+        
         # Early Stopping 判斷
         if test_loss < best_loss:
             best_loss = test_loss
             counter = 0
-            best_model_wts = model.state_dict()  # 存最佳模型
+            best_model_wts = deepcopy(model.state_dict())   # 存最佳模型
         else:
             counter += 1
 
@@ -459,6 +410,7 @@ def train_model(model, device, criterion, train_loader, test_loader,
             break
 
     # 回復最佳模型
-    model.load_state_dict(best_model_wts)
+    if best_model_wts:
+        model.load_state_dict(best_model_wts)
 
     return train_loss_list, test_loss_list
