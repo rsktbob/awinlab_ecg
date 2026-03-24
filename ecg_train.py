@@ -5,12 +5,8 @@ import torchvision.transforms.v2 as T
 import timm
 from pathlib import Path
 import numpy as np
-from sklearn.metrics import accuracy_score
 from timm.data import create_transform
-from ecg_tool import ECGDataset, ECGModel, RandomShrinkSignal, prepare_data, evaluate_model, train_model
-from PIL import Image
-from torchvision.transforms import InterpolationMode
-from torchvision import transforms  
+from ecg_tool import ECGDataset, ECGModel, prepare_data, evaluate_model, train_model
 
 if __name__ == "__main__":
     # 資料類別
@@ -37,7 +33,6 @@ if __name__ == "__main__":
         scale=(0.6, 1.0), 
         auto_augment=None,
     )
-
 
     test_transform = create_transform(
         **data_config,

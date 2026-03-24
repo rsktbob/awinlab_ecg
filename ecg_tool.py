@@ -1,30 +1,22 @@
 import torch
 from torch import nn, optim
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from PIL import Image
-import torchvision.transforms.v2 as T
+import torchvision.transforms.functional as TF
 import pandas as pd
 import timm
 from copy import deepcopy
 from pathlib import Path
 import ast
 from sklearn.model_selection import train_test_split
-from torch.optim.lr_scheduler import LinearLR, CosineAnnealingLR, SequentialLR
 import numpy as np
 from sklearn.metrics import (
     f1_score, roc_auc_score, precision_score,
     recall_score, classification_report
 )
 import random
-import torchvision.transforms.functional as TF
 import matplotlib.pyplot as plt
-from transformers import get_cosine_schedule_with_warmup
-import matplotlib.cm as cm
-from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-from pytorch_grad_cam.utils.image import show_cam_on_image
 import os
-import cv2
 
 SUPER_CLASS_NAMES = ['NORM', 'MI', 'STTC', 'CD', 'HYP']
 PTB_XL_ROOT = Path('ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3')
@@ -162,7 +154,7 @@ def draw_attention_img(img, tensor, model, save_path):
 def predict_img(model, device, test_transform, img_path, is_attention_map):
     img_path = Path(img_path)
     img_idx = img_path.stem[:5]
-    save_folder = Path('vit_ecg_images/test/') / img_idx
+    save_folder = Path('ecg_attention_images/') / img_idx
 
     img = Image.open(img_path).convert('RGB')
     tensor = test_transform(img).unsqueeze(0).to(device)

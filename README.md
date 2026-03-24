@@ -17,7 +17,7 @@
 ├── ecg_image_generator.py  # 處理原始 ECG 資料並生成 CWT 影像的程式
 ├── ecg_train.py            # 訓練 ViT 模型的程式
 ├── ecg_eval.py             # 評估已訓練模型的程式
-├── test_predict.py         # 用來展示predict_ecg函式的使用
+├── test_predict.py         # 用來展示predict_img函式的使用
 ├── requirements.txt        # Python 相依套件清單
 ├── venv/                   # Python 虛擬環境（此資料夾容量較大，超過 GitHub 上限，可用 requirements.txt 重新建立環境）     
 ├── ecg_models/             # 儲存訓練好的模型（此資料夾容量較大，超過 GitHub 上限，可從 Google Drive 下載：https://drive.google.com/drive/folders/1tM3R6hCHCNamfD-4ZcnQmtnL1Aq2bfz2?usp=drive_link）
@@ -75,4 +75,28 @@ python ecg_eval.py
 
 ## 🧪 專案使用說明
 
-ecg_eval.py 中的 predict_ecg(img_path, model, label_names, device, threshold=0.5) 函式會回傳機率高於設定 threshold 的標籤與對應機率。使用方式可以參考test_predict.py。
+test_predict.py 使用說明
+
+此檔案用來測試單張 ECG 影像的預測結果。
+
+使用流程
+載入模型
+建立影像前處理
+呼叫 predict_img() 進行預測
+
+```bash
+class_probs = predict_img(
+    model=model,
+    device=device,
+    img_path='test_images/xxx.png',
+    test_transform=test_transform,
+    is_attention_map=True
+)
+```
+輸出
+回傳機率 > 0.5 的類別
+格式：
+[('MI', 0.87), ('STTC', 0.65)]
+注意
+輸入需為 CWT ECG 圖
+is_attention_map=True 會額外輸出attention圖

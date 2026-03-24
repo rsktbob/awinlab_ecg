@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     class_probs = predict_img(model=model, 
                               device=device, 
-                              img_path='vit_ecg_images/hr/cwt/00002_hr_12lead_vit_cwt.png',
+                              img_path='test_images/00002_hr_12lead_vit_cwt.png',
                               test_transform=test_transform,
                               is_attention_map=True)
     
