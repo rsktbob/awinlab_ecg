@@ -72,7 +72,7 @@ python ecg_eval.py
 
 此腳本將執行以下動作：
 - 載入訓練好的模型。
-- 計算 **Accuracy (準確率)**、**F1-Score** 和 **AUROC**。
+- 計算 **Precision**、**F1-Score** 和 **AUROC**。
 - 對範例影像進行預測並輸出結果。
 
 ## 🧪 專案使用說明
