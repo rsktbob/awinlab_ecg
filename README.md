@@ -8,7 +8,7 @@
 - **影像生成**：使用 `pywt` 將一維 (1-D) ECG 訊號轉換為二維 (2-D) 的時頻表示圖 (CWT 頻譜圖)。
 - **深度學習模型**：利用 `timm` 函式庫中先進的 Vision Transformers (ViT) 進行影像分類。
 - **多標籤分類**：支援單一 ECG 紀錄對應多個診斷標籤的分類任務。
-- **評估指標**：計算準確率 (Accuracy)、F1-Score (Macro) 以及 AUROC (Macro)。
+- **評估指標**：計算Precision、F1-Score (Macro) 以及 AUROC (Macro)。
 
 ## 📂 專案結構
 
@@ -20,8 +20,10 @@
 ├── test_predict.py         # 用來展示predict_img函式的使用
 ├── requirements.txt        # Python 相依套件清單
 ├── venv/                   # Python 虛擬環境（此資料夾容量較大，超過 GitHub 上限，可用 requirements.txt 重新建立環境）     
-├── ecg_models/             # 儲存訓練好的模型（此資料夾容量較大，超過 GitHub 上限，可從 Google Drive 下載：https://drive.google.com/drive/folders/1tM3R6hCHCNamfD-4ZcnQmtnL1Aq2bfz2?usp=drive_link）
-├── vit_ecg_images/         # 儲存生成的 ECG 影像（此資料夾容量較大，可用 ecg_image_generator.py 產生影像）
+├── ecg_models/             # 儲存訓練好的模型（此資料夾容量較大，超過 GitHub 上限，可從 Google Drive 下載：https://drive.google.com/file/d/1_jiW5AdDk04GFhlf6WG_dFsouNqEC183/view?usp=drive_link）
+├── vit_ecg_images/         # 儲存生成的 ECG 影像（此資料夾容量較大，可用 ecg_image_generator.py 產生影
+像）
+├── test_images/            # 儲存測試用的圖片
 └── ptb-xl-.../             # (外部) PTB-XL 資料集目錄（此部分需自行下載，可至 https://physionet.org/content/ptb-xl/1.0.3/）
 ```
 
@@ -41,7 +43,7 @@
 
 1.  **下載資料集**：確保 PTB-XL 資料集位於專案根目錄下 `ptb-xl-a-large-publicly-available-electrocardiography-dataset-1.0.3/`。(可到https://physionet.org/content/ptb-xl/1.0.3進行下載)
 2.  **生成影像**：
-    執行生成腳本將 ECG 訊號轉換為 CWT 影像。此過程使用多行程 (multiprocessing) 加速轉換。
+    執行生成腳本將 ECG 訊號轉換為 CWT 影像。此過程使用多行程 (multiprocessing) 加速轉換，若只是要進行測試可使用test_images的圖片進行測試。
 
     ```bash
     python ecg_image_generator.py
@@ -58,7 +60,7 @@ python ecg_train.py
 
 - **模型架構**：`vit_small_patch16_dinov3` (透過 `timm` 載入)。
 - **輸入資料**：來自 `vit_ecg_images/` 的 CWT 影像。
-- **輸出結果**：最佳模型權重將儲存至 `ecg_models/ecg_vit_model_v8.pth`。
+- **輸出結果**：最佳模型權重將儲存至 `ecg_models/deit3_small_patch16_384_16_v3`。
 
 ## 📉 模型評估
 
